@@ -1,1 +1,1 @@
-# Tranpile Python Code (With Type Hints) to C
+# Transpile Python Code (With Type Hints) to C

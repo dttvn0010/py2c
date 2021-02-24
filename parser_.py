@@ -65,8 +65,9 @@ ast_node = ast.parse(src)
 
 node = parse('''
 def test2(x: List[int, int]):
-    x = 1
-    y = 2
-    z= f'{x}+{y}={x+y}'
+    for i in range(10):
+        print(i)
+    else:
+        print(10)
 ''')
 print(node)

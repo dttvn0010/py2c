@@ -4,13 +4,31 @@ from variable import Variable
 from typing import List
 
 class Scope:
-    def __init__(self):
-        self.parent: Scope = None
+    def __init__(self, parent: Scope=None):        
+        self.parent = parent
         self.symbols: List[Symbol] = []
         self.variables : List[Variable] = []
         self.class_fields: List[Variable] = []
         self.className = ''
+        self.children : List[Scope] = []
+        self.hasGoToEnd = False
+        self.hasReturn = False
+        self.hasForQuit = False     # break/continue
+        self.isFunction = False
+        self.isLoop = False
+        if parent != None:
+            self.name =  parent.name + '_' + str(len(parent.children))
+            parent.children.append(self)
+        else:
+            self.name = 'Scope'
         
+    def hasReferenceVariable(self):
+        for var in self.variables:
+            if var.type_.isClass():
+                return True
+
+        return False
+
     def findLocal(self, name:str):
         return next((x for x in self.symbols if x.name == name), None)
         

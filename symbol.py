@@ -6,10 +6,11 @@ if TYPE_CHECKING:
     from scope import Scope
       
 class Symbol:    
-    def __init__(self, name: str, resolvedType=None, isClass=False):
+    def __init__(self, name: str, resolvedType=None, is_class=False):
         self.name = name
         self.resolvedType = resolvedType
-        self.isClass = isClass
+        self.is_class = is_class
+        self.initialized = False
         
     def __repr__(self):
         return self.name

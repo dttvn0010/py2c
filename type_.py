@@ -35,7 +35,7 @@ VALUE_TYPES = INT_TYPES + UINT_TYPES + FLOAT_TYPES + [ BuiltInType.BOOL]
 REFERENCE_TYPES = [
     BuiltInType.STR,
     BuiltInType.LIST,
-    BuiltInType.TUPLE,
+    #BuiltInType.TUPLE,
     BuiltInType.DICT,
     BuiltInType.SET,
     BuiltInType.DICT_ITEM,
@@ -54,14 +54,20 @@ GENERIC_TYPES = [
 
 
 class Type:
-    def __init__(self, name='', isClass=False, genericType:Type=None, elementTypes:List[Type]=[]):
+    def __init__(self, name='', is_class=False, genericType:Type=None, elementTypes:List[Type]=[]):
         self.name = name
-        self.isClass = isClass
+        self.is_class = is_class
         self.genericType = genericType
         self.elementTypes = elementTypes
         if genericType:
-            self.isClass = True
+            self.is_class = True
             self.name = '__'.join([genericType.name] + [x.name for x in elementTypes])
+
+    def isClass(self):
+        return self.is_class and not self.isTuple()
+        
+    def isTuple(self):
+        return self.genericType and self.genericType.name == BuiltInType.TUPLE
 
     def __repr__(self):
         return self.name

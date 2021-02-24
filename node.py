@@ -55,7 +55,7 @@ class Node:
         self.range_ = ''
         self.internalRange = ''
         self.symbol : Symbol = None
-        self.resolvedType : Type = None
+        self.resolvedType : Type = None        
         
     def __getattr__(self, key):
         return self.children.get(key)
@@ -68,16 +68,16 @@ class Node:
     
     def getText(self) -> str:
         if self.nodeType == NodeType.VALUE:
-            return self.value
+            return str(self.value)
 
         if self.nodeType == NodeType.NUM:
-            return self.getChild('n')
+            return str(self.getChild('n'))
 
         if self.nodeType == NodeType.NAME:
-            return self.getChild('id')
+            return str(self.getChild('id'))
         
         if self.nodeType == NodeType.ATTR:
-            return self.getChild('value').getText() + '->' + self.getChild('attr')
+            return self.getChild('value').getText() + '.__body__->' + self.getChild('attr')
 
     def isExpression(self) -> bool:
         return self.nodeType in [

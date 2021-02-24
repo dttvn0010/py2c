@@ -321,9 +321,8 @@ def resolveClass(node: Node, parentScope: Scope):
             child.resolvedType = type_
             parentScope.define(symbol)
 
-            scope = Scope()
+            scope = Scope(parentScope)
             scope.className = name
-            scope.parent = parentScope
             child.scope = scope
 
 def resolveFunction(node: Node, parentScope: Scope):
@@ -344,8 +343,8 @@ def resolveFunction(node: Node, parentScope: Scope):
             child.resolvedType = type_
             parentScope.define(symbol)
             
-            scope = Scope()
-            scope.parent = parentScope
+            scope = Scope(parentScope)
+            scope.isFunction = True
             scope.className = parentScope.className
             child.scope = scope 
 
@@ -356,11 +355,14 @@ def resolveAssign(parentScope: Scope, target: Node, type_: Type, addVar=True):
     if target.nodeType == NodeType.NAME:    
         name = target.getText()
         symbol = parentScope.findNested(name)
+        
         if not symbol:
             if addVar:
                 parentScope.addVariable(name, type_)
-            target.symbol = Symbol(name, type_)
-            parentScope.define(target.symbol)
+            symbol = Symbol(name, type_)
+            parentScope.define(symbol)
+
+        target.symbol = symbol
     
     elif target.nodeType == NodeType.TUPLE:
         elts = target.getChild('elts')
@@ -420,9 +422,14 @@ def resolve(node: Node, parentScope: Scope):
         elif node.isExpression():            
             node.resolvedType = getExpressionType(node)
             
+        elif nodeType == NodeType.WHILE:
+            scope = Scope(parentScope)
+            scope.isLoop = True
+            parentScope = node.scope = scope 
+
         elif nodeType in [NodeType.FOR, NodeType.COMP]:
-            scope = Scope()
-            scope.parent = parentScope
+            scope = Scope(parentScope)
+            scope.isLoop = nodeType == NodeType.FOR
             parentScope = node.scope = scope 
 
             target = node.getChild('target')
@@ -433,9 +440,8 @@ def resolve(node: Node, parentScope: Scope):
             resolveAssign(parentScope, target, type_.elementTypes[0], addVar=False)
             
         elif nodeType == NodeType.BLOCK:
-            if node.parent.nodeType not in [NodeType.CLASS, NodeType.FUNCTION, NodeType.FOR]:
-                scope = Scope()
-                scope.parent = parentScope
+            if node.parent.nodeType not in [NodeType.CLASS, NodeType.FUNCTION, NodeType.FOR, NodeType.WHILE]:
+                scope = Scope(parentScope)
                 parentScope = node.scope = scope 
             else:
                 parentScope = node.scope = node.parent.scope
@@ -489,9 +495,9 @@ class Compiler:
         self.defineNativeTypes()
         
     def defineNativeTypes(self):
-        for type_ in VALUE_TYPES + REFERENCE_TYPES + [BuiltInType.VOID]:
-            isClass = type_ in REFERENCE_TYPES
-            symbol = Symbol(type_, Type(type_, isClass))
+        for type_ in VALUE_TYPES + REFERENCE_TYPES + [BuiltInType.VOID, BuiltInType.TUPLE]:
+            is_class = type_ in REFERENCE_TYPES
+            symbol = Symbol(type_, Type(type_, is_class))
             self.global_.scope.define(symbol)
 
     def addInput(self, src: str):

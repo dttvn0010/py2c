@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import List
 from node import Node, NodeType
 from symbol import Symbol
-from type_ import BuiltInType, VALUE_TYPES, REFERENCE_TYPES, combineListTypes
+from type_ import *
+from variable import Variable
 
 op_signs = {
     'Add': '+',
@@ -267,7 +268,7 @@ class CResult:
 
         if func.nodeType == NodeType.NAME:
             func_name = func.getText()
-            if func.symbol and func.symbol.isClass:
+            if func.symbol and func.symbol.is_class:
                 className = func_name
                 func_name = func_name + '__init__'
                 isConstructor = True
@@ -278,6 +279,7 @@ class CResult:
             typeName = type_.genericType.name if type_.genericType else type_.name
             attr = func.getChild('attr')
             func_name = f'{typeName}__{attr}'
+            args = [var] + args
         else:
             raise Exception('Unknown node type:' + func.nodeType)
         
@@ -290,32 +292,69 @@ class CResult:
         if func_name == 'next':
             return self.emitNext(node)
 
-        if not isConstructor:
-            if func_name in VALUE_TYPES:
-                self.append(f'({func_name})')
-            elif func_name == 'str' and args:
-                self.append(args[0].symbol.resolvedType.name + '__to_str')
-            else:
-                self.append(func_name)
+        if func_name in VALUE_TYPES:
+            func_name = f'({func_name})'
+        elif func_name == 'str' and args:
+            func_name = args[0].symbol.resolvedType.name + '__to_str'
+            
+        useTmp = False
+        arg_vars = [arg.getText() for arg in args]
+        tmp_args = []
+        tmp_arg_vars = []
 
-            self.append('(')
-            if func.nodeType == NodeType.ATTR:
-                self.append(func.getChild('value').getChild('id'))
-                if args: self.append(', ')
-             
-            self.emitExpressionChain(args)            
-            self.append(')')
-        else:
-            self.append('({\n')
+        for i, arg in enumerate(args):
+            if not arg.getText():
+                tmp_args.append(arg)
+                tmp_arg_vars.append(f' __arg__{i}__')
+                arg_vars[i] = f' __arg__{i}__'
+                useTmp = True
+                
+        if isConstructor:
+            arg_vars = ['__self__'] + arg_vars
+            useTmp = True
+        
+        returnTypeName = node.resolvedType.name if node.resolvedType else BuiltInType.VOID
+        if useTmp:
+            if returnTypeName != BuiltInType.VOID:
+                self.append('(')
+
+            self.append('{\n')
             self.indent += 1
-            self.emitIndent().append(f'{className} __tmp__ = zeroalloc(sizeof(__{className}__body__));\n')
-            self.emitIndent().append(func_name + '(__tmp__')
-            if args: self.append(', ')
-            self.emitExpressionChain(args)
-            self.append(');\n')
-            self.emitIndent().append('__tmp__;\n')
-            self.indent -= 1
-            self.emitIndent().append('})')
+            for i, tmp_arg in enumerate(tmp_args):
+                self.emitIndent().append(tmp_arg.resolvedType.name)
+                self.append(' ').append(tmp_arg_vars[i]).append(' = ')
+                self.emitExpression(tmp_arg).append(';\n')
+
+            if isConstructor:
+                self.emitIndent().append(f'{className} __self__;\n')
+                self.emitIndent().append(f'__self__.__body__ = zeroalloc(sizeof(__{className}__body__));\n')
+                self.emitIndent().append('__self__.__body__->__ref_count__ = 1;\n')
+                self.emitIndent().append('__self__.__ref_hold__ = TRUE;\n')
+                self.emitIndent()
+            elif returnTypeName != BuiltInType.VOID:
+                self.emitIndent().append(returnTypeName).append(' __ret__ = ') 
+            else:
+                self.emitIndent()           
+            
+        self.append(func_name).append('(').append(', '.join(arg_vars)).append(')')
+
+        if useTmp:
+            self.append(';\n')
+            
+            for i, tmp_arg in enumerate(tmp_args):
+                if tmp_arg.resolvedType.isClass():
+                    self.emitIndent().append(f'release_ref({tmp_arg_vars[i]});\n')
+
+            if isConstructor:
+                self.emitIndent().append('__self__;\n')
+            elif node.resolvedType:
+                self.emitIndent().append('__ret__;\n')
+
+            self.indent -=1
+            self.emitIndent().append('}')
+
+            if returnTypeName != BuiltInType.VOID:
+                self.append(')')
 
     def emitTuple(self, node: Node) :
         type_ = node.resolvedType
@@ -446,9 +485,27 @@ class CResult:
 
         return self
 
-    def emitVariable(self, variable:Node):        
+    def emitVariableInit(self, variable:Variable):        
         self.emitIndent()
-        self.append(variable.type_.name).append(' ').append(variable.name).append(';\n')
+        self.append(variable.type_.name).append(' ').append(variable.name)
+
+        #if variable.type_.isClass():
+        #    self.append(' = NULL')
+        if variable.type_.name in INT_TYPES + UINT_TYPES:
+            self.append( ' = 0')
+        elif variable.type_.name == BuiltInType.FLOAT32:
+            self.append(' = 0.0f')
+        elif variable.type_.name == BuiltInType.FLOAT64:
+            self.append( ' = 0.0')
+        elif variable.type_.name == BuiltInType.BOOL:
+            self.append( ' = FALSE')
+
+        self.append(';\n')
+
+    def emitVariableDestroy(self, variable:Variable):                
+        if variable.type_.isClass():
+            self.emitIndent()
+            self.append(f'release_ref({variable.name});\n')
 
     def emitClass(self, node: Node):
         className = node.getChild('name')
@@ -467,7 +524,7 @@ class CResult:
         self.append(' ')        
         self.append(symbol.name)
         self.append('(')
-        
+                
         for i, arg in enumerate(args):
             self.append(arg.resolvedType.name).append(' ')
             self.append(arg.getChild('arg'))
@@ -476,9 +533,24 @@ class CResult:
             
         self.append(")\n")
 
-        self.emitBlock(node.getChild('body'))
-        self.append('\n')
-            
+        self.emitIndent().append('{\n')
+        self.indent += 1
+
+        if returnType and returnType.name != BuiltInType.VOID:
+            self.emitIndent().append(returnType.name).append(' __ret__;\n')
+
+        self.emitIndent().append('bool __is_return__ = FALSE;\n')
+
+        self.emitBlock(node.getChild('body'), bracket=False)
+
+        if returnType and returnType.name != BuiltInType.VOID:
+            self.emitIndent().append('return __ret__;\n')
+        else:
+            self.emitIndent().append('return;\n')
+
+        self.indent -= 1
+        self.emitIndent().append('}\n\n')
+
     def emitAssign(self, target: Node, value: Node):
         if target.nodeType == NodeType.TUPLE:
             targetElts = target.getChild('elts')
@@ -503,7 +575,19 @@ class CResult:
                 self.emitIndent().append('}\n')
 
         elif target.nodeType in [NodeType.NAME, NodeType.ATTR]:
-            self.emitIndent().append(target.getText()).append(' = ').emitExpression(value).append(';\n')
+            targetVar = target.getText()
+            initialized = target.symbol.initialized if target.symbol else True
+            isClass = target.resolvedType.isClass()
+            if isClass and initialized:
+                self.emitIndent().append(f'release_ref({targetVar});\n')
+                
+            self.emitIndent().append(targetVar).append(' = ').emitExpression(value).append(';\n')
+            
+            if isClass and value.nodeType in [NodeType.NAME, NodeType.ATTR]:
+                self.emitIndent().append(f'inc_ref({targetVar});\n')
+
+            if target.symbol:
+                target.symbol.initialized = True
         
         elif target.nodeType == NodeType.SUBSCRIPT:
             index = target.getChild('slice').getChild('value')
@@ -529,11 +613,6 @@ class CResult:
         
         self.append(' ').append(op).append('=').append(' ')
         self.emitExpression(node.getChild('value')).append(';\n')
-
-    def emitReturn(self, node: Node):
-        self.emitIndent()
-        value = node.getChild('value')
-        self.append("return ").emitExpression(value).append(";\n")
 
     def emitIf(self, node, indent=True):
         if indent: 
@@ -613,8 +692,13 @@ class CResult:
         self.emitExpression(index_var).append(' += ').emitExpression(step).append(')\n')
 
         self.emitIfs(node.getChild('ifs'))
-            
+        
+        self.emitIndent().append('{\n')
+
+        self.indent += 1
         emitBody()
+        self.indent -= 1
+        self.emitIndent().append('}\n')
 
     def emitForRangeWithElse(self, node: Node):
         index_var, start, end, step = self.getForRangeInfo(node)
@@ -639,7 +723,7 @@ class CResult:
         self.emitIndent().append('{\n')                         # start else
         self.indent += 1
 
-        self.emitBlock(node.getChild('orelse'))
+        self.emitBlock(node.getChild('orelse'), bracket=False, orelseBlock=True)
         
         self.emitIndent().append('break;\n')
         self.indent -= 1
@@ -750,7 +834,7 @@ class CResult:
 
         self.emitForListAssign(target, type_.elementTypes[0], [], iter_var, index_var)
 
-        self.emitBlock(node.getChild('body'))
+        self.emitBlock(node.getChild('body'), bracket=False)
         self.indent -= 1
 
         self.emitIndent().append('}\n')
@@ -760,7 +844,7 @@ class CResult:
         self.emitIndent().append('{\n')                         # start else
         self.indent += 1
 
-        self.emitBlock(node.getChild('orelse'))
+        self.emitBlock(node.getChild('orelse'), bracket=False, orelseBlock=True)
         
         self.emitIndent().append('break;\n')
         self.indent -= 1
@@ -918,7 +1002,7 @@ class CResult:
         self.emitIndent().append('{\n')                         # start else
         self.indent += 1
 
-        self.emitBlock(node.getChild('orelse'))
+        self.emitBlock(node.getChild('orelse'), bracket=False, orelseBlock=True)
         
         self.emitIndent().append('break;\n')
         self.indent -= 1
@@ -990,7 +1074,7 @@ class CResult:
 
         elseBlock = node.getChild('orelse')
         if elseBlock and elseBlock.getChild('items'):
-            self.emitBlock(elseBlock)
+            self.emitBlock(elseBlock, bracket=False, orelseBlock=True)
         
         self.emitIndent().append('break;\n')
         self.indent -= 1
@@ -1063,7 +1147,7 @@ class CResult:
 
         elseBlock = node.getChild('orelse')
         if elseBlock and elseBlock.getChild('items'):
-            self.emitBlock(elseBlock)
+            self.emitBlock(elseBlock, bracket=False, orelseBlock=True)
         
         self.emitIndent().append('break;\n')
         self.indent -= 1
@@ -1145,13 +1229,13 @@ class CResult:
             assert(len(targets) == 1)
             target_attrs = ['item->key']
             
-        emitBlock = lambda: self.emitBlock(node.getChild('body'))
+        emitBlock = lambda: self.emitBlock(node.getChild('body'), bracket=False)
 
-        if type_.name == BuiltInType.RANGE:
+        if genericTypeName == BuiltInType.RANGE:
             if hasElse:
                 self.emitForRangeWithElse(node)
             else:
-                self.emitForRange(node, emitBody=emitBody or emitBlock)
+                self.emitForRange(node, index=index, emitBody=emitBody or emitBlock)
 
         elif isList:
             if hasElse:
@@ -1207,23 +1291,28 @@ class CResult:
             self.indent -= 1
             self.emitIndent().append('}\n')
 
-    def emitBlock(self, node, bracket=True):
+    def emitBlock(self, node, bracket=True, orelseBlock=False):
         items = node.getChild('items')
-        self.emitIndent()
-
+        
         if not items:
             self.append("{}\n" if bracket else '')
             return
 
         scope = node.scope
         if bracket:
-            self.append("{\n")
+            self.emitIndent().append("{\n")
             self.indent += 1
         
-        for variable in scope.variables:
-            self.emitVariable(variable)
+        if node.parent.nodeType != NodeType.MODULE:
+            if node.parent.nodeType in [NodeType.FOR, NodeType.WHILE] and not orelseBlock:
+                self.emitIndent().append('bool __is_break__ = FALSE, __is_continue__ = FALSE;\n')
 
-        for item in items:
+        for variable in scope.variables:
+            self.emitVariableInit(variable)
+
+        hasReturn = False
+        
+        for i,item in enumerate(items):
             if item.nodeType == NodeType.BLOCK:
                 self.emitBlock(item)
 
@@ -1247,10 +1336,24 @@ class CResult:
                 self.emitWhile(item)
             
             elif item.nodeType == NodeType.CONTINUE:
-                self.emitIndent().append('continue;\n')
+                self.emitIndent().append('__is_continue__ = TRUE;\n')
+                tmpScope = scope
+                while not(tmpScope.isLoop or tmpScope.hasReferenceVariable()):
+                    tmpScope = tmpScope.parent
 
-            elif item.nodeType == NodeType.BREAK:
-                self.emitIndent().append('break;\n')
+                tmpScope.hasGoToEnd = True
+                tmpScope.hasForQuit = True
+                self.emitIndent().append(f'goto __{tmpScope.name}__end__;\n')
+
+            elif item.nodeType == NodeType.BREAK:                                
+                self.emitIndent().append('__is_break__ = TRUE;\n')
+                tmpScope = scope
+                while not(tmpScope.isLoop or tmpScope.hasReferenceVariable()):
+                    tmpScope = tmpScope.parent
+
+                tmpScope.hasGoToEnd = True
+                tmpScope.hasForQuit = True
+                self.emitIndent().append(f'goto __{tmpScope.name}__end__;\n')                
 
             elif item.nodeType in [NodeType.ASSIGN, NodeType.ANN_ASSIGN]:
                 if item.nodeType == NodeType.ASSIGN:
@@ -1267,7 +1370,53 @@ class CResult:
                 self.emitAugAssign(item)
             
             elif item.nodeType == NodeType.RETURN:
-                self.emitReturn(item)
+                value = item.getChild('value')
+                hasReturn = True
+                if value:
+                    self.emitIndent().append('__ret__ = ').emitExpression(value).append(';\n')
+                    if value.nodeType in [NodeType.NAME, NodeType.ATTR] and value.resolvedType.isClass():
+                        self.emitIndent().append(f'inc_ref({value.getText()});\n')
+                
+                if node.parent.nodeType != NodeType.FUNCTION:
+                    self.emitIndent().append('__is_return__ = TRUE;\n')
+
+                tmpScope = scope
+                while not(tmpScope.isFunction or tmpScope.hasReferenceVariable()):
+                    tmpScope = tmpScope.parent
+
+                tmpScope.hasGoToEnd = True
+                tmpScope.hasReturn = True
+                if scope != tmpScope or i+1 != len(items):
+                    self.emitIndent().append(f'goto __{tmpScope.name}__end__;\n')
+        
+        if scope.hasGoToEnd and not orelseBlock:
+            self.emitIndent().append(f'__{scope.name}__end__:\n')
+        
+        if scope.hasReferenceVariable():
+            for variable in scope.variables:
+                self.emitVariableDestroy(variable)
+
+            if not scope.isFunction and scope.hasReturn:
+                parentScope = scope.parent
+                while not(parentScope.isFunction or parentScope.hasReferenceVariable()):
+                    parentScope = parentScope.parent
+                    
+                parentScope.hasGoToEnd = True
+                parentScope.hasReturn = True
+                self.emitIndent().append(f'if(__is_return__) goto __{parentScope.name}__end__;\n')
+
+            if not scope.isLoop and scope.hasForQuit:
+                parentScope = scope.parent
+                while not(parentScope.isLoop or parentScope.hasReferenceVariable()):
+                    parentScope = parentScope.parent
+                    
+                parentScope.hasGoToEnd = True
+                parentScope.hasForQuit = True
+
+                self.emitIndent().append(f'if(__is_break__ || __is_continue__) goto __{parentScope.name}__end__;\n')
+
+        if scope.isLoop and not orelseBlock:
+            self.emitIndent().append('if(__is_break__) break;\n')
 
         if bracket:
             self.indent -= 1
@@ -1286,8 +1435,18 @@ class CResult:
             self.append(field.type_.name)
             self.append(' ').append(field.name).append(';\n')
         
+        self.emitIndent().append('int __ref_count__;\n')
+
         self.indent -= 1
-        self.append(f'}} __{className}__body__, *{className};\n\n')
+        self.append(f'}} __{className}__body__;\n\n')
+
+        self.append('typedef struct \n{\n')
+        self.indent += 1
+        self.emitIndent().append(f'__{className}__body__* __body__;\n')
+        self.emitIndent().append('bool __ref_hold__;\n')
+        self.indent -= 1
+        self.append(f'}} {className};\n\n')
+
     
     def emitTupleDef(self, type_: Type):
         elementTypes = type_.elementTypes

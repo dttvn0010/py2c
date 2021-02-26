@@ -15,10 +15,12 @@ typedef unsigned long long uint64;
 
 typedef float float32;
 typedef double float64;
+
 typedef unsigned char bool;
 
 #define TRUE    1
 #define FALSE   0
+
 #define True    1
 #define False   0
 
@@ -33,6 +35,7 @@ typedef unsigned char bool;
         type* data;                     \
         int* p_size;                    \
         int* p_capacity;                \
+        int __ref_count__;              \
     }__##list_type##__body__, * list_type;
 
 DECLARE_LIST(List__int, int);
@@ -52,6 +55,18 @@ DECLARE_LIST(List__float32, float32);
 
 #define List__append(lst, i) {}
 
-#define inc_ref(ref) {}
-#define release_ref(ref) {}
+#define inc_ref(ref)                                                \
+    if((ref).__ref_hold__ && (ref).__body__)                        \
+    {                                                               \
+        (ref).__body__->__ref_count__ += 1;                         \
+    }
+
+#define release_ref(ref)                                            \
+    if((ref).__ref_hold__ && (ref).__body__)                        \
+    {                                                               \
+        if(--(ref).__body__->__ref_count__ == 0) {                  \
+            free(ref.__body__);                                     \
+        }                                                           \
+    }
+
 #endif

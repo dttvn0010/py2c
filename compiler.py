@@ -1,7 +1,7 @@
 import ast
 from node import Node, NodeType, toNode
 from scope import Scope
-from symbol import Symbol
+from symbol import Symbol, SymbolKind
 from codegen import CResult
 from type_ import *
 from typing import List
@@ -45,9 +45,8 @@ def getArgumentType(node: Node, index: int) -> Type:
     if annotation:
         return getAnnotationType(node.parentScope, annotation)
 
-    elif index == 0 and node.parentScope.className:
-        className = node.parentScope.className
-        return getType(node.parentScope, className)
+    elif index == 0:
+        return node.parentScope.classType
         
 def getFunctionReturnType(node: Node) -> str:
     name = node.getChild('name')
@@ -88,6 +87,9 @@ def getExpressionType(node: Node) -> str:
             return Type(BuiltInType.INT32)
         elif val.count('.') == 1 and val.replace('.', '').isdigit():
             return Type(BuiltInType.FLOAT64)
+            
+        elif val in ['True', 'False']:
+            return Type(BuiltInType.BOOL)
 
         raise Exception('Cannot determine type for: ' , val)
 
@@ -108,11 +110,10 @@ def getExpressionType(node: Node) -> str:
         typeName = type_.name
         genericTypeName = genericType.name if genericType else ''
         attr = node.getChild('attr')
-        symbol = node.parentScope.findNested(typeName + '__' + attr)
-        
-        if symbol:
-            node.symbol = symbol
-            return symbol.resolvedType
+        field = type_.getField(attr)
+               
+        if field:
+            return field.type_
 
         elif genericTypeName == BuiltInType.LIST:
             if attr == 'get':
@@ -183,9 +184,19 @@ def getExpressionType(node: Node) -> str:
                 tupleType = Type(genericType=tupleType, elementTypes=elementTypes)
                 return Type(genericType=listType, elementTypes=[tupleType])
             
-        resolve(func, node.parentScope)
-        return func.resolvedType
+            resolve(func, node.parentScope)
+            return func.resolvedType
+            
+        elif func.nodeType == NodeType.ATTR:
+            var = func.getChild('value')
+            resolve(var, node.parentScope)
+            attr = func.getChild('attr')
+            symbol = node.parentScope.findNested(var.resolvedType.name + '__' + attr)
+            return symbol.resolvedType
         
+        else:
+            raise Exception('Unknown node type: ' + func.nodeType)
+
     if node.nodeType == NodeType.IF_EXP:
         left = node.getChild('body').getChild('items')
         right = node.getChild('orelse').getChild('items')
@@ -319,13 +330,13 @@ def resolveClass(node: Node, parentScope: Scope):
         if child.nodeType == NodeType.CLASS:
             name = child.getChild('name')
             type_ = Type(name, True)
-            symbol = Symbol(name, type_, True)
+            symbol = Symbol(name, type_, SymbolKind.CLASS)
             child.symbol = symbol
             child.resolvedType = type_
             parentScope.define(symbol)
 
             scope = Scope(parentScope)
-            scope.className = name
+            scope.classType = type_
             child.scope = scope
 
 def resolveFunction(node: Node, parentScope: Scope):
@@ -334,21 +345,25 @@ def resolveFunction(node: Node, parentScope: Scope):
             child.parentScope = parentScope
             name = child.getChild('name')
             
-            if parentScope.className:
+            if parentScope.classType:
                 if name != '__init__':
-                    name = parentScope.className + '__' + name
+                    name = parentScope.classType.name + '__' + name
                 else:
-                    name = parentScope.className + name
+                    name = parentScope.classType.name + name
 
             type_ = getFunctionReturnType(child)
             symbol = Symbol(name, type_)
             child.symbol = symbol
             child.resolvedType = type_
-            parentScope.define(symbol)
+            global_ = parentScope
+            while global_.parent != None:
+                global_ = global_.parent
+
+            global_.define(symbol)
             
             scope = Scope(parentScope)
             scope.isFunction = True
-            scope.className = parentScope.className
+            scope.classType = parentScope.classType
             child.scope = scope 
 
 def resolveAssign(parentScope: Scope, target: Node, type_: Type, addVar=True):
@@ -360,8 +375,6 @@ def resolveAssign(parentScope: Scope, target: Node, type_: Type, addVar=True):
         symbol = parentScope.findNested(name)
         
         if not symbol:
-            if addVar:
-                parentScope.addVariable(name, type_)
             symbol = Symbol(name, type_)
             parentScope.define(symbol)
 
@@ -383,12 +396,9 @@ def resolveAssign(parentScope: Scope, target: Node, type_: Type, addVar=True):
         if tmp and tmp.getChild('name') == '__init__':
             args = tmp.getChild('args').getChild('args')
             if args and args[0].getChild('arg') == var_name:
-                className = tmp.parentScope.className
-                symbolName = className + '__' + var_attr
-                symbol = tmp.parentScope.parent.findNested(symbolName)
-                if not symbol:
-                    tmp.parentScope.addClassField(var_attr, type_)
-                    tmp.parentScope.parent.define(Symbol(symbolName, type_))
+                classType = tmp.parentScope.classType
+                classType.addField(var_attr, type_)
+               
     elif target.nodeType == NodeType.SUBSCRIPT:
         pass
     else:

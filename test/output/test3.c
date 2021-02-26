@@ -37,7 +37,6 @@ typedef struct
 void print(int s)
 {
     bool __is_return__ = FALSE;
-    return;
 }
 
 void Point__init__(Point self, int x, int y)
@@ -45,7 +44,6 @@ void Point__init__(Point self, int x, int y)
     bool __is_return__ = FALSE;
     self.__body__->x = x;
     self.__body__->y = y;
-    return;
 }
 
 int testFor1(int N)
@@ -220,7 +218,6 @@ void test2(Set__int x, List__int y)
         __tmp__;
     });
     release_ref(lst);
-    return;
 }
 
 void test3(List__Tuple__int__int lst)
@@ -234,7 +231,6 @@ void test3(List__Tuple__int__int lst)
         print(i, j);
         if(__is_break__) break;
     }
-    return;
 }
 
 void test4(List__int y, Dict__int__int d)
@@ -266,6 +262,5 @@ void test4(List__int y, Dict__int__int d)
     release_ref(z);
     release_ref(s);
     release_ref(d2);
-    return;
 }
 

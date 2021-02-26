@@ -6,6 +6,7 @@ import ast
 if TYPE_CHECKING:
     from scope import Scope
     from symbol import Symbol
+    from type_ import Type
 
 class NodeType:
     GLOBAL = 'Global'
@@ -83,6 +84,17 @@ class Node:
         if self.nodeType == NodeType.ATTR:
             return self.getChild('value').getText() + '.__body__->' + self.getChild('attr')
 
+    def getRootVar(self) -> str:
+        node = self
+        
+        while node.nodeType != NodeType.NAME:
+            if node.nodeType not in [NodeType.ATTR, NodeType.SUBSCRIPT]:
+                return ''
+
+            node = node.getChild('value')
+        
+        return node.getText()
+
     def isExpression(self) -> bool:
         return self.nodeType in [
             NodeType.NAME, 
@@ -122,7 +134,18 @@ class Node:
                 child_nodes.append(child_node)
 
         return child_nodes
-                
+
+    def getAllChildren(self) -> List[Node]:
+        child_nodes = []
+
+        def iter_(node: Node, child_nodes):
+            for child_node in node.getChildNodes():
+                child_nodes += [child_node]
+                iter_(child_node, child_nodes)
+
+        iter_(self, child_nodes)
+        return child_nodes
+
     def to_str(self, level=0):
         tab = "  "
         indent = tab * level

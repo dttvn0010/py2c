@@ -34,7 +34,6 @@ void Point__init__(Point self, float32 x, float32 y)
     bool __is_return__ = FALSE;
     self.__body__->x = x;
     self.__body__->y = y;
-    return;
 }
 
 float32 Point__getX(Point self)
@@ -82,7 +81,6 @@ void Line__init__(Line self, Point pt1, Point pt2)
     release_ref(self.__body__->pt2);
     self.__body__->pt2 = pt2;
     inc_ref(self.__body__->pt2);
-    return;
 }
 
 Point Line__getMidPoint(Line self)
@@ -115,7 +113,6 @@ void Line__setPoint1(Line self, float x1, float y1)
         Point__init__(__self__, x1, y1);
         __self__;
     });
-    return;
 }
 
 void Line__setPoint2(Line self, Point pt)
@@ -124,7 +121,6 @@ void Line__setPoint2(Line self, Point pt)
     release_ref(self.__body__->pt2);
     self.__body__->pt2 = pt;
     inc_ref(self.__body__->pt2);
-    return;
 }
 
 Line newLine(float32 x1, float32 y1, float32 x2, float32 y2)
@@ -193,7 +189,12 @@ Point newPoint(float32 x, float32 y)
                 Point__init__(__self__, x, y);
                 __self__;
             });
+            __ret__ = tmp1;
+            inc_ref(tmp1);
+            __is_return__ = TRUE;
+            __Scope_3_0_0__end__:
             release_ref(tmp1);
+            if(__is_return__) goto __Scope_3_0__end__;
         }
         else
         {
@@ -249,14 +250,12 @@ Point newPoint(float32 x, float32 y)
 void print(float32 x, float32 y)
 {
     bool __is_return__ = FALSE;
-    return;
 }
 
 void testPoint(Point pt)
 {
     bool __is_return__ = FALSE;
     print(pt.__body__->x, pt.__body__->y);
-    return;
 }
 
 Line test()

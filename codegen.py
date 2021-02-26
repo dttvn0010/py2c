@@ -3,7 +3,6 @@ from typing import List
 from node import Node, NodeType
 from symbol import Symbol
 from type_ import *
-from variable import Variable
 
 op_signs = {
     'Add': '+',
@@ -262,6 +261,22 @@ class CResult:
         self.indent -= 1
         self.emitIndent().append('})')
 
+    def emitRelease(self, type_: Type, prefix: str):
+        if type_.isTuple():
+            for i, elementType in enumerate(type_.elementTypes):
+                self.emitRelease(elementType, prefix + f'._{i}')
+        
+        elif type_.isClass():
+            self.emitIndent().append(f'release_ref({prefix});\n')
+            for field in type_.fields:
+                if field.type_.isReference():
+                    self.emitIndent().append(f'if({prefix}.__body__)').append('\n')
+                    self.emitIndent().append('{\n')
+                    self.indent += 1
+                    self.emitRelease(field.type_, prefix + '.__body__->' + field.name)
+                    self.indent -= 1
+                    self.emitIndent().append('}\n')
+
     def emitCall(self, node: Node) :
         func = node.getChild('func')
         args = node.getChild('args')
@@ -270,7 +285,7 @@ class CResult:
 
         if func.nodeType == NodeType.NAME:
             func_name = func.getText()
-            if func.symbol and func.symbol.is_class:
+            if func.symbol and func.symbol.isClass():
                 className = func_name
                 func_name = func_name + '__init__'
                 isConstructor = True
@@ -344,8 +359,8 @@ class CResult:
             self.append(';\n')
             
             for i, tmp_arg in enumerate(tmp_args):
-                if tmp_arg.resolvedType.isClass():
-                    self.emitIndent().append(f'release_ref({tmp_arg_vars[i]});\n')
+                if tmp_arg.resolvedType.isReference():
+                    self.emitRelease(tmp_arg.resolvedType, tmp_arg_vars[i])
 
             if isConstructor:
                 self.emitIndent().append('__self__;\n')
@@ -487,27 +502,28 @@ class CResult:
 
         return self
 
-    def emitVariableInit(self, variable:Variable):        
-        self.emitIndent()
-        self.append(variable.type_.name).append(' ').append(variable.name)
+    def emitVariableInit(self, variable:Symbol):        
+        type_ = variable.resolvedType
 
-        #if variable.type_.isClass():
-        #    self.append(' = NULL')
-        if variable.type_.name in INT_TYPES + UINT_TYPES:
+        self.emitIndent()
+        self.append(type_.name).append(' ').append(variable.name)
+                
+        if type_.name in INT_TYPES + UINT_TYPES:
             self.append( ' = 0')
-        elif variable.type_.name == BuiltInType.FLOAT32:
+        elif type_.name == BuiltInType.FLOAT32:
             self.append(' = 0.0f')
-        elif variable.type_.name == BuiltInType.FLOAT64:
+        elif type_.name == BuiltInType.FLOAT64:
             self.append( ' = 0.0')
-        elif variable.type_.name == BuiltInType.BOOL:
+        elif type_.name == BuiltInType.BOOL:
             self.append( ' = FALSE')
 
         self.append(';\n')
 
-    def emitVariableDestroy(self, variable:Variable):                
-        if variable.type_.isClass():
-            self.emitIndent()
-            self.append(f'release_ref({variable.name});\n')
+    def emitVariableDestroy(self, variable:Symbol): 
+        type_ = variable.resolvedType
+
+        if type_.isReference():
+            self.emitRelease(type_, variable.name)
 
     def emitClass(self, node: Node):
         className = node.getChild('name')
@@ -547,7 +563,7 @@ class CResult:
 
         if returnType and returnType.name != BuiltInType.VOID:
             self.emitIndent().append('return __ret__;\n')
-        else:
+        elif node.scope.hasGoToEnd:
             self.emitIndent().append('return;\n')
 
         self.indent -= 1
@@ -579,13 +595,13 @@ class CResult:
         elif target.nodeType in [NodeType.NAME, NodeType.ATTR]:
             targetVar = target.getText()
             initialized = target.symbol.initialized if target.symbol else True
-            isClass = target.resolvedType.isClass()
-            if isClass and initialized:
+            isRef = target.resolvedType.isReference()
+            if isRef and initialized:
                 self.emitIndent().append(f'release_ref({targetVar});\n')
                 
             self.emitIndent().append(targetVar).append(' = ').emitExpression(value).append(';\n')
             
-            if isClass and value.nodeType in [NodeType.NAME, NodeType.ATTR]:
+            if isRef and value.nodeType in [NodeType.NAME, NodeType.ATTR]:
                 self.emitIndent().append(f'inc_ref({targetVar});\n')
 
             if target.symbol:
@@ -1293,14 +1309,122 @@ class CResult:
             self.indent -= 1
             self.emitIndent().append('}\n')
 
-    def emitBlock(self, node, bracket=True, orelseBlock=False):
-        items = node.getChild('items')
+    def getBorrowingArgIndexes(self, func: Node, inputIndexes: List[int]) -> List[int]:
+        borrowingIndexes = set()
+
+        args = func.getChild('args').getChild('args')
+        args = [x.getChild('arg') for x in args]
+        input_args = [args[i] for i in inputIndexes]
+        items = func.getAllChildren()
         
+        targets = []
+
+        for i,item in enumerate(items):
+            if item.nodeType == NodeType.ASSIGN:
+                value = item.getChild('value')
+                if value.getRootVar() in input_args:
+                    targets += item.getChild('targets')
+                    
+        for target in targets:
+            targetVar = target.getRootVar()
+            if targetVar in args and targetVar not in input_args:
+                borrowingIndexes.add(args.index(targetVar))
+
+        return list(borrowingIndexes)   
+
+    def isMoveOutScope(self, var: str, block: Node) -> bool:
+        symbol = block.scope.findNested(var)
+
+        if not symbol.resolvedType.isReference():
+            return False            
+
+        if symbol.scope.depth < block.scope.depth:
+            return True
+
+        items = block.getAllChildren()
+        
+        targets = []
+
+        for i,item in enumerate(items):
+            if item.nodeType in NodeType.ASSIGN:
+                value = item.getChild('value')
+                if value.getRootVar() == var:
+                    targets += item.getChild('targets')
+
+        for target in targets:
+            targetVar = target.getRootVar()
+            if targetVar:
+                symbol = block.scope.findNested(targetVar)
+                
+                if not symbol or symbol.scope.depth < block.scope.depth:
+                    return True
+
+        for i,item in enumerate(items):
+            if item.nodeType == NodeType.CALL:
+                func = item.getChild('func')
+                isConstructor = False
+               
+                args = item.getChild('args')
+
+                if func.nodeType == NodeType.NAME:
+                    func_name = func.getChild('id')
+                    if func.symbol and func.symbol.isClass():
+                        func_name = func_name + '__init__'
+                        isConstructor = True
+                elif func.nodeType == NodeType.ATTR:
+                    obj = func.getChild('value')
+                    func_name = obj.resolvedType.name + '__' + func.getChild('attr')
+                    args = [obj] + args  
+                      
+                    
+                module = item.parent
+                while module.nodeType != NodeType.MODULE:
+                    module = module.parent
+                
+                module_items = module.getAllChildren()
+                func = None
+                for module_item in module_items:
+                    if module_item.nodeType == NodeType.FUNCTION and module_item.symbol and module_item.symbol.name == func_name:
+                        func = module_item
+                        break
+                
+                inputIndexes = [i for i,arg in enumerate(args) if arg.getRootVar() == var]
+                if isConstructor:
+                    inputIndexes = [i+1 for i in inputIndexes]
+
+                borrowingIndexes = self.getBorrowingArgIndexes(func, inputIndexes)
+
+                for index in borrowingIndexes:
+                    if isConstructor:
+                        if index == 0:      # self
+                            if item.parent.nodeType == NodeType.ASSIGN:
+                                borrowingArgs = item.parent.getChild('targets')
+                            else: 
+                                borrowingArgs = []
+                        else:
+                            borrowingArgs = [args[index-1]]
+                    else:
+                        borrowingArgs = [args[index]]
+                            
+                    for borrowingArg in borrowingArgs:
+                        if self.isMoveOutScope(borrowingArg.getRootVar(), block):
+                            return True
+
+        return False               
+                    
+    def emitBlock(self, node: Node, bracket=True, orelseBlock=False):
+        items = node.getChild('items')
+
         if not items:
             self.append("{}\n" if bracket else '')
             return
 
         scope = node.scope
+
+        print('scope:', scope.name)
+        for variable in scope.getVariables():
+            print(variable.name , ', move out of scope: ' , self.isMoveOutScope(variable.name, node))
+        
         if bracket:
             self.emitIndent().append("{\n")
             self.indent += 1
@@ -1309,7 +1433,7 @@ class CResult:
             if node.parent.nodeType in [NodeType.FOR, NodeType.WHILE] and not orelseBlock:
                 self.emitIndent().append('bool __is_break__ = FALSE, __is_continue__ = FALSE;\n')
 
-        for variable in scope.variables:
+        for variable in scope.getVariables():
             self.emitVariableInit(variable)
 
         hasReturn = False
@@ -1319,8 +1443,21 @@ class CResult:
                 self.emitBlock(item)
 
             elif item.nodeType == NodeType.EXPR:
-                self.emitIndent()
-                self.emitExpression(item.getChild('value')).append(';\n')
+                value = item.getChild('value')
+                isRef = value.resolvedType and value.resolvedType.isReference()
+                if isRef:
+                    self.emitIndent().append('{\n')
+                    self.indent += 1
+                    self.emitIndent().append(value.resolvedType.name).append(' __tmp__ = ')
+                else:
+                    self.emitIndent()
+                    
+                self.emitExpression(value).append(';\n')
+
+                if isRef:
+                    self.emitRelease(value.resolvedType, '__tmp__')
+                    self.indent -= 1
+                    self.emitIndent().append('}\n')
 
             elif item.nodeType == NodeType.CLASS:
                 self.emitClass(item)
@@ -1395,7 +1532,7 @@ class CResult:
             self.emitIndent().append(f'__{scope.name}__end__:\n')
         
         if scope.hasReferenceVariable():
-            for variable in scope.variables:
+            for variable in scope.getVariables():
                 self.emitVariableDestroy(variable)
 
             if not scope.isFunction and scope.hasReturn:
@@ -1432,7 +1569,7 @@ class CResult:
         self.append('typedef struct \n{\n')
         self.indent += 1
 
-        for field in node.scope.class_fields:
+        for field in node.resolvedType.fields:
             self.emitIndent()
             self.append(field.type_.name)
             self.append(' ').append(field.name).append(';\n')

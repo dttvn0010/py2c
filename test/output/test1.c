@@ -16,3 +16,12 @@ int add(int x, int y)
     return __ret__;
 }
 
+int main()
+{
+    int __ret__;
+    bool __is_return__ = FALSE;
+    __ret__ = 0;
+    __Scope_1__end__:
+    return __ret__;
+}
+

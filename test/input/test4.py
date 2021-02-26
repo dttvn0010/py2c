@@ -40,7 +40,7 @@ def newPoint(x: float32, y: float32) -> Point:
         tmp0 = Point(0.0, 0.0)
         if y > 0:
             tmp1 = Point(x, y)
-            #return tmp1
+            return tmp1
         else:
             tmp2 = Point(x, -y)
             if x > 1:

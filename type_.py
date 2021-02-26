@@ -52,7 +52,11 @@ GENERIC_TYPES = [
     BuiltInType.DICT_ITEM
 ]
 
-
+class Field:
+    def __init__(self, name: str, type_: Type):
+        self.name = name
+        self.type_ = type_
+        
 class Type:
     def __init__(self, name='', is_class=False, genericType:Type=None, elementTypes:List[Type]=[]):
         self.name = name
@@ -63,11 +67,28 @@ class Type:
             self.is_class = True
             self.name = '__'.join([genericType.name] + [x.name for x in elementTypes])
 
+        self.fields : List[Field] = []
+
     def isClass(self):
         return self.is_class and not self.isTuple()
         
     def isTuple(self):
         return self.genericType and self.genericType.name == BuiltInType.TUPLE
+
+    def isReference(self):
+        if self.isClass():
+            return True
+
+        if self.isTuple():
+            for elementType in self.elementTypes:
+                if elementType.isClass():
+                    return True
+
+    def addField(self, field_name: str, field_type: Type):
+        self.fields.append(Field(field_name, field_type))
+
+    def getField(self, field_name: str) -> Field:
+        return next((f for f in self.fields if f.name == field_name), None)
 
     def __repr__(self):
         return self.name

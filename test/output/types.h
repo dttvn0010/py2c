@@ -17,6 +17,11 @@ typedef float float32;
 typedef double float64;
 typedef unsigned char bool;
 
+#define TRUE    1
+#define FALSE   0
+#define True    1
+#define False   0
+
 #define zeroalloc(sz) ({                \
     void* ptr = malloc(sz);             \
     memset(ptr, 0, sz);                 \
@@ -47,4 +52,6 @@ DECLARE_LIST(List__float32, float32);
 
 #define List__append(lst, i) {}
 
+#define inc_ref(ref) {}
+#define release_ref(ref) {}
 #endif

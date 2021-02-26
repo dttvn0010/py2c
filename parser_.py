@@ -68,5 +68,8 @@ def add(x: int, y: int) -> int:
     s = 1
     t = 2
     return x + y
+
+def test(x: int, y:int):
+    add(x, y)    
 ''')
 print(node)

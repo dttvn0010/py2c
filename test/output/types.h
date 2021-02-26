@@ -15,6 +15,7 @@ typedef unsigned long long uint64;
 
 typedef float float32;
 typedef double float64;
+typedef unsigned char bool;
 
 #define zeroalloc(sz) ({                \
     void* ptr = malloc(sz);             \

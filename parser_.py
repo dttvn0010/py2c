@@ -64,10 +64,9 @@ ast_node = ast.parse(src)
 #print(dump(ast_node, include_attributes=False, indent=2))
 
 node = parse('''
-def test2(x: List[int, int]):
-    for i in range(10):
-        print(i)
-    else:
-        print(10)
+def add(x: int, y: int) -> int:
+    s = 1
+    t = 2
+    return x + y
 ''')
 print(node)

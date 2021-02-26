@@ -82,11 +82,14 @@ def getFunctionReturnType(node: Node) -> str:
             raise Exception('Unknown node type:' + return_.nodeType)
 
 def getExpressionType(node: Node) -> str:
-    if node.nodeType == NodeType.NUM:
-        val = node.getChild('n')
-        if val.__class__.__name__ == 'float':
+    if node.nodeType in [NodeType.NUM, NodeType.CONSTANT]:
+        val = node.getText()
+        if val.isdigit():
+            return Type(BuiltInType.INT32)
+        elif val.count('.') == 1 and val.replace('.', '').isdigit():
             return Type(BuiltInType.FLOAT64)
-        return Type(BuiltInType.INT32)
+
+        raise Exception('Cannot determine type for: ' , val)
 
     if node.nodeType in NodeType.NAME:
         name = node.getText()

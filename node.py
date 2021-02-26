@@ -32,6 +32,7 @@ class NodeType:
     DICT = 'Dict'
     RETURN = 'Return'
     NUM = 'Num'
+    CONSTANT = 'Constant'
     ASSIGN = 'Assign'
     ANN_ASSIGN = 'AnnAssign'
     AUG_ASSIGN = 'AugAssign'
@@ -73,6 +74,9 @@ class Node:
         if self.nodeType == NodeType.NUM:
             return str(self.getChild('n'))
 
+        if self.nodeType == NodeType.CONSTANT:
+            return str(self.getChild('value'))
+
         if self.nodeType == NodeType.NAME:
             return str(self.getChild('id'))
         
@@ -83,6 +87,7 @@ class Node:
         return self.nodeType in [
             NodeType.NAME, 
             NodeType.NUM, 
+            NodeType.CONSTANT, 
             NodeType.IF_EXP, 
             NodeType.BIN_OP, 
             NodeType.UNARY_OP, 

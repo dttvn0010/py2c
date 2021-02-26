@@ -36,6 +36,8 @@ def get_sign(node: Node) -> int:
         val = node.value
     elif node.nodeType == NodeType.NUM:
         val = node.getChild('n')
+    elif node.nodeType == NodeType.CONSTANT:
+        val = node.getChild('value')
     else:
         return None
    
@@ -433,7 +435,7 @@ class CResult:
         if not node:
             return self
 
-        if node.nodeType in [NodeType.VALUE, NodeType.NUM, NodeType.NAME, NodeType.ATTR]:
+        if node.nodeType in [NodeType.VALUE, NodeType.NUM, NodeType.CONSTANT, NodeType.NAME, NodeType.ATTR]:
             if forceBracket: self.append('(')
             self.append(node.getText())
             if forceBracket: self.append(')')

@@ -37,24 +37,31 @@ typedef struct
 void print(int s)
 {
     bool __is_return__ = FALSE;
+    int s = 0;
 }
 
 void Point__init__(Point self, int x, int y)
 {
     bool __is_return__ = FALSE;
+    Point self;
+    int x = 0;
+    int y = 0;
     self.__body__->x = x;
     self.__body__->y = y;
+    release_ref(self);
 }
 
 int testFor1(int N)
 {
     int __ret__;
     bool __is_return__ = FALSE;
+    int N = 0;
     int32 s = 0;
     s = 0;
     for(int i = 0; i < N; i += 1)
     {
         bool __is_break__ = FALSE, __is_continue__ = FALSE;
+        int32 i = 0;
         s += i;
         if(__is_break__) break;
     }
@@ -65,6 +72,7 @@ int testFor1(int N)
             if(i < N)
             {
                 bool __is_break__ = FALSE, __is_continue__ = FALSE;
+                int32 i = 0;
                 s += i;
                 if(i > 100)
                 {
@@ -107,6 +115,7 @@ int testFor1(int N)
             }
             else
             {
+                int32 i = 0;
                 s += N;
                 break;
             }
@@ -122,12 +131,14 @@ int testFor2(List__int lst)
 {
     int __ret__;
     bool __is_return__ = FALSE;
+    List__int lst;
     int32 s = 0;
     s = 0;
     for(int __index__ = 0; __index__ < List__len(lst);__index__++)
     {
         int i = List__at(lst, __index__);
         bool __is_break__ = FALSE, __is_continue__ = FALSE;
+        int i = 0;
         s += i;
         if(__is_break__) break;
     }
@@ -139,6 +150,7 @@ int testFor2(List__int lst)
             {
                 int i = List__at(lst, __index__);
                 bool __is_break__ = FALSE, __is_continue__ = FALSE;
+                int i = 0;
                 s += i;
                 if(i > 100)
                 {
@@ -151,6 +163,7 @@ int testFor2(List__int lst)
             }
             else
             {
+                int i = 0;
                 s *= 2;
                 break;
             }
@@ -159,6 +172,7 @@ int testFor2(List__int lst)
     }
     __ret__ = s;
     __Scope_3__end__:
+    release_ref(lst);
     return __ret__;
 }
 
@@ -166,6 +180,7 @@ List__float square(List__float lst)
 {
     List__float __ret__;
     bool __is_return__ = FALSE;
+    List__float lst;
     __ret__ = ({
         List__float32 __tmp__ = List__float32__empty();
         for(int __index__ = 0; __index__ < List__len(lst);__index__++)
@@ -176,6 +191,7 @@ List__float square(List__float lst)
         __tmp__;
     });
     __Scope_4__end__:
+    release_ref(lst);
     return __ret__;
 }
 
@@ -201,6 +217,8 @@ Tuple__int__int test1()
 void test2(Set__int x, List__int y)
 {
     bool __is_return__ = FALSE;
+    Set__int x;
+    List__int y;
     List__int32 lst;
     lst = ({
         List__int32 __tmp__ = List__int32__empty();
@@ -217,25 +235,33 @@ void test2(Set__int x, List__int y)
         }
         __tmp__;
     });
+    release_ref(x);
+    release_ref(y);
     release_ref(lst);
 }
 
 void test3(List__Tuple__int__int lst)
 {
     bool __is_return__ = FALSE;
+    List__Tuple__int__int lst;
     for(int __index__ = 0; __index__ < List__len(lst);__index__++)
     {
         int i = List__at(lst, __index__)._0;
         int j = List__at(lst, __index__)._1;
         bool __is_break__ = FALSE, __is_continue__ = FALSE;
+        int i = 0;
+        int j = 0;
         print(i, j);
         if(__is_break__) break;
     }
+    release_ref(lst);
 }
 
 void test4(List__int y, Dict__int__int d)
 {
     bool __is_return__ = FALSE;
+    List__int y;
+    Dict__int__int d;
     int t = 0;
     List__int z;
     Set__int32 s;
@@ -259,6 +285,8 @@ void test4(List__int y, Dict__int__int d)
     });
     List__set(z, 1, List__get(y, t, 0));
     Dict__set(d2, 2, 3);
+    release_ref(y);
+    release_ref(d);
     release_ref(z);
     release_ref(s);
     release_ref(d2);

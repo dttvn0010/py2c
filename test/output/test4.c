@@ -32,16 +32,22 @@ typedef struct
 void Point__init__(Point self, float32 x, float32 y)
 {
     bool __is_return__ = FALSE;
+    Point self;
+    float32 x = 0.0f;
+    float32 y = 0.0f;
     self.__body__->x = x;
     self.__body__->y = y;
+    release_ref(self);
 }
 
 float32 Point__getX(Point self)
 {
     float32 __ret__;
     bool __is_return__ = FALSE;
+    Point self;
     __ret__ = self.__body__->x;
     __Scope_0_1__end__:
+    release_ref(self);
     return __ret__;
 }
 
@@ -49,8 +55,10 @@ float32 Point__getY(Point self)
 {
     float32 __ret__;
     bool __is_return__ = FALSE;
+    Point self;
     __ret__ = self.__body__->y;
     __Scope_0_2__end__:
+    release_ref(self);
     return __ret__;
 }
 
@@ -58,6 +66,8 @@ Point Point__add(Point self, Point pt)
 {
     Point __ret__;
     bool __is_return__ = FALSE;
+    Point self;
+    Point pt;
     __ret__ = ({
         float32  __arg__0__ = (Point__getX(self) + pt.__body__->x);
         float32  __arg__1__ = (self.__body__->y + Point__getY(pt));
@@ -69,24 +79,41 @@ Point Point__add(Point self, Point pt)
         __self__;
     });
     __Scope_0_3__end__:
+    release_ref(self);
+    release_ref(pt);
     return __ret__;
 }
 
 void Line__init__(Line self, Point pt1, Point pt2)
 {
     bool __is_return__ = FALSE;
+    Line self;
+    Point pt1;
+    Point pt2;
     release_ref(self.__body__->pt1);
     self.__body__->pt1 = pt1;
     inc_ref(self.__body__->pt1);
     release_ref(self.__body__->pt2);
     self.__body__->pt2 = pt2;
     inc_ref(self.__body__->pt2);
+    release_ref(self);
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt1);
+    }
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt2);
+    }
+    release_ref(pt1);
+    release_ref(pt2);
 }
 
 Point Line__getMidPoint(Line self)
 {
     Point __ret__;
     bool __is_return__ = FALSE;
+    Line self;
     __ret__ = ({
         float64  __arg__0__ = ((self.__body__->pt1.__body__->x + self.__body__->pt2.__body__->x) / ((double)2));
         float64  __arg__1__ = ((self.__body__->pt1.__body__->y + self.__body__->pt2.__body__->y) / ((double)2));
@@ -98,12 +125,24 @@ Point Line__getMidPoint(Line self)
         __self__;
     });
     __Scope_1_1__end__:
+    release_ref(self);
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt1);
+    }
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt2);
+    }
     return __ret__;
 }
 
 void Line__setPoint1(Line self, float x1, float y1)
 {
     bool __is_return__ = FALSE;
+    Line self;
+    float x1;
+    float y1;
     release_ref(self.__body__->pt1);
     self.__body__->pt1 = ({
         Point __self__;
@@ -113,20 +152,45 @@ void Line__setPoint1(Line self, float x1, float y1)
         Point__init__(__self__, x1, y1);
         __self__;
     });
+    release_ref(self);
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt1);
+    }
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt2);
+    }
 }
 
 void Line__setPoint2(Line self, Point pt)
 {
     bool __is_return__ = FALSE;
+    Line self;
+    Point pt;
     release_ref(self.__body__->pt2);
     self.__body__->pt2 = pt;
     inc_ref(self.__body__->pt2);
+    release_ref(self);
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt1);
+    }
+    if(self.__body__)
+    {
+        release_ref(self.__body__->pt2);
+    }
+    release_ref(pt);
 }
 
 Line newLine(float32 x1, float32 y1, float32 x2, float32 y2)
 {
     Line __ret__;
     bool __is_return__ = FALSE;
+    float32 x1 = 0.0f;
+    float32 y1 = 0.0f;
+    float32 x2 = 0.0f;
+    float32 y2 = 0.0f;
     Point pt1;
     Point pt2;
     Line line;
@@ -160,6 +224,14 @@ Line newLine(float32 x1, float32 y1, float32 x2, float32 y2)
     release_ref(pt1);
     release_ref(pt2);
     release_ref(line);
+    if(line.__body__)
+    {
+        release_ref(line.__body__->pt1);
+    }
+    if(line.__body__)
+    {
+        release_ref(line.__body__->pt2);
+    }
     return __ret__;
 }
 
@@ -167,6 +239,8 @@ Point newPoint(float32 x, float32 y)
 {
     Point __ret__;
     bool __is_return__ = FALSE;
+    float32 x = 0.0f;
+    float32 y = 0.0f;
     if(x > 0)
     {
         Point tmp0;
@@ -250,12 +324,16 @@ Point newPoint(float32 x, float32 y)
 void print(float32 x, float32 y)
 {
     bool __is_return__ = FALSE;
+    float32 x = 0.0f;
+    float32 y = 0.0f;
 }
 
 void testPoint(Point pt)
 {
     bool __is_return__ = FALSE;
+    Point pt;
     print(pt.__body__->x, pt.__body__->y);
+    release_ref(pt);
 }
 
 Line test()
@@ -299,6 +377,14 @@ Line test()
     inc_ref(line);
     __Scope_6__end__:
     release_ref(line);
+    if(line.__body__)
+    {
+        release_ref(line.__body__->pt1);
+    }
+    if(line.__body__)
+    {
+        release_ref(line.__body__->pt2);
+    }
     release_ref(pt);
     return __ret__;
 }

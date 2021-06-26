@@ -32,7 +32,7 @@ def main() -> int:
     if True:
         foo2 = Foo(20)
         bar2 = Bar(foo2)
-        #copyFoo(bar, foo)
-        #testInit(baz, Bar(foo))
+        copyFoo(bar, foo)
+        testInit(baz, Bar(foo))
         copyBarFoo(bar, bar2)
     return 0

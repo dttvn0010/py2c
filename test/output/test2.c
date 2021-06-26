@@ -7,6 +7,8 @@ float max1(float x, float y)
 {
     float __ret__;
     bool __is_return__ = FALSE;
+    float x;
+    float y;
     __ret__ = ((x > y)? (x) : (y));
     __Scope_0__end__:
     return __ret__;
@@ -16,6 +18,8 @@ float max2(float x, float y)
 {
     float __ret__;
     bool __is_return__ = FALSE;
+    float x;
+    float y;
     if(x > y)
     {
         __ret__ = x;
@@ -36,6 +40,9 @@ float max3(float x, float y, float z)
 {
     float __ret__;
     bool __is_return__ = FALSE;
+    float x;
+    float y;
+    float z;
     if(y <= x && x >= z)
     {
         __ret__ = x;

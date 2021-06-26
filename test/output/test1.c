@@ -7,6 +7,8 @@ int add(int x, int y)
 {
     int __ret__;
     bool __is_return__ = FALSE;
+    int x = 0;
+    int y = 0;
     int32 s = 0;
     int32 t = 0;
     s = 1;

@@ -1332,86 +1332,6 @@ class CResult:
 
         return list(borrowingIndexes)   
 
-    def isMoveOutScope(self, var: str, block: Node) -> bool:
-        symbol = block.scope.findNested(var)
-
-        if not symbol.resolvedType.isReference():
-            return False            
-
-        if symbol.scope.depth < block.scope.depth:
-            return True
-
-        items = block.getAllChildren()
-        
-        targets = []
-
-        for i,item in enumerate(items):
-            if item.nodeType in NodeType.ASSIGN:
-                value = item.getChild('value')
-                if value.getRootVar() == var:
-                    targets += item.getChild('targets')
-
-        for target in targets:
-            targetVar = target.getRootVar()
-            if targetVar:
-                symbol = block.scope.findNested(targetVar)
-                
-                if not symbol or symbol.scope.depth < block.scope.depth:
-                    return True
-
-        for i,item in enumerate(items):
-            if item.nodeType == NodeType.CALL:
-                func = item.getChild('func')
-                isConstructor = False
-               
-                args = item.getChild('args')
-
-                if func.nodeType == NodeType.NAME:
-                    func_name = func.getChild('id')
-                    if func.symbol and func.symbol.isClass():
-                        func_name = func_name + '__init__'
-                        isConstructor = True
-                elif func.nodeType == NodeType.ATTR:
-                    obj = func.getChild('value')
-                    func_name = obj.resolvedType.name + '__' + func.getChild('attr')
-                    args = [obj] + args  
-                      
-                    
-                module = item.parent
-                while module.nodeType != NodeType.MODULE:
-                    module = module.parent
-                
-                module_items = module.getAllChildren()
-                func = None
-                for module_item in module_items:
-                    if module_item.nodeType == NodeType.FUNCTION and module_item.symbol and module_item.symbol.name == func_name:
-                        func = module_item
-                        break
-                
-                inputIndexes = [i for i,arg in enumerate(args) if arg.getRootVar() == var]
-                if isConstructor:
-                    inputIndexes = [i+1 for i in inputIndexes]
-
-                borrowingIndexes = self.getBorrowingArgIndexes(func, inputIndexes)
-
-                for index in borrowingIndexes:
-                    if isConstructor:
-                        if index == 0:      # self
-                            if item.parent.nodeType == NodeType.ASSIGN:
-                                borrowingArgs = item.parent.getChild('targets')
-                            else: 
-                                borrowingArgs = []
-                        else:
-                            borrowingArgs = [args[index-1]]
-                    else:
-                        borrowingArgs = [args[index]]
-                            
-                    for borrowingArg in borrowingArgs:
-                        if self.isMoveOutScope(borrowingArg.getRootVar(), block):
-                            return True
-
-        return False               
-                    
     def emitBlock(self, node: Node, bracket=True, orelseBlock=False):
         items = node.getChild('items')
 
@@ -1420,10 +1340,6 @@ class CResult:
             return
 
         scope = node.scope
-
-        print('scope:', scope.name)
-        for variable in scope.getVariables():
-            print(variable.name , ', move out of scope: ' , self.isMoveOutScope(variable.name, node))
         
         if bracket:
             self.emitIndent().append("{\n")

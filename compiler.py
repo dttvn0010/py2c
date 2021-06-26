@@ -191,6 +191,10 @@ def getExpressionType(node: Node) -> str:
             var = func.getChild('value')
             resolve(var, node.parentScope)
             attr = func.getChild('attr')
+            
+            if attr == 'get' and var.resolvedType.genericType and var.resolvedType.genericType.name == 'List':
+                return var.resolvedType.elementTypes[0]
+
             symbol = node.parentScope.findNested(var.resolvedType.name + '__' + attr)
             return symbol.resolvedType
         

@@ -3,7 +3,7 @@ import os
 import traceback
 
 if __name__ == '__main__':
-    for f in ['test.py'] :#os.listdir('test/input'):
+    for f in os.listdir('test/input'):
         print('Process file:', f)
         input_file = os.path.join('test/input', f)
         output_file = os.path.join('test/output', f.replace('.py', '.c'))
